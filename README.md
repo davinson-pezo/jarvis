@@ -70,11 +70,15 @@ All optional except `GEMINI_API_KEY`. See `.env.example` for the full list:
 
 ## 🎙️ Usage
 
-Say **"Jarvis"** to wake him up; he will listen for a few seconds, think, and reply. You can keep talking without repeating the wake word while the conversation is active.
+Jarvis runs in **continuous-listen mode** — no wake word required. Launch the app and it greets you with *"Good evening, sir. Systems are online."* From that moment on, just speak. It picks up whatever you say in Spanish or English, thinks, and replies in the same language with the matching voice.
 
-Text shortcut (web only): there is an input box in the side HUD to type to him instead of talking. Useful when you're on a call.
+The loop is: `LISTENING → THINKING → SPEAKING → LISTENING`. A short cooldown after each reply keeps it from hearing its own voice. Phrases up to ~20 seconds with natural pauses work fine.
 
-Shutdown: shutdown button in the HUD, or quit from Activity Monitor.
+**Text input (web HUD)** — as an alternative to speaking, type your command in the transmission log input box and hit `SEND`. Useful on meetings, noisy rooms, or when you just want to test something quickly. Jarvis still replies with voice.
+
+**Shutdown** — the big `SHUTDOWN` button in the footer triggers an animated goodbye (*"Good bye, sir."*) and then cleanly kills the process. Closing the terminal / browser tab alone doesn't stop it; you can also quit from Activity Monitor if needed.
+
+> ℹ️ A wake-word scaffold (`jarvis`, `hey jarvis`, `hola jarvis`, `oye jarvis`) exists in `jarvis_core.py` but is currently unused. If you prefer wake-word-gated behavior over continuous listening, hooking it into `run_voice_loop` is a good first contribution.
 
 ## 🏗️ Architecture
 
