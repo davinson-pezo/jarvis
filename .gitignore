@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Secretos: NUNCA subir
+.env
+.env.*
+!.env.example
+
+# Entorno virtual
+.venv/
+venv/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Editores / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Notas locales (opcional, por si tienes un scratchpad)
+notes.md
+NOTES.md
+TODO.local.md

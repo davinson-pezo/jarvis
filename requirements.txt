@@ -1,0 +1,26 @@
+# Dependencias de Jarvis
+# Instalación: pip install -r requirements.txt
+
+# Cerebro
+google-genai>=0.3.0
+
+# Voz y audio
+SpeechRecognition>=3.10.0
+PyAudio>=0.2.13
+
+# UI de escritorio
+customtkinter>=5.2.0
+
+# Servidor web
+Flask>=3.0.0
+Flask-SocketIO>=5.3.6
+simple-websocket>=1.0.0
+
+# Entorno
+python-dotenv>=1.0.0
+
+# Solo para empaquetar .app con build_app.sh (opcional)
+pyinstaller>=6.3.0
+# La 2026.4 viene rota: el rthooks.dat referencia archivos que no se incluyen
+# en el paquete. Pinneamos por debajo hasta que lo arreglen.
+pyinstaller-hooks-contrib<2026

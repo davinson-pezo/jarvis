@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J A R V I S | Neural Link</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="overlay scanlines"></div>
+    <div id="shutdown-overlay" class="shutdown-overlay hidden">
+        <div class="shutdown-title">SHUTTING DOWN</div>
+        <div class="shutdown-sub">Good bye, sir.</div>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="system-tag">PROTOCOL V3  //  NEURAL LINK</div>
+            <h1 id="main-status">INITIALIZING...</h1>
+            <div class="meta">
+                <span>VOICE: <span id="voice-indicator">—</span></span>
+                <span>LANG: <span id="lang-indicator">—</span></span>
+            </div>
+        </header>
+
+        <!-- Main -->
+        <main>
+            <!-- Reactor + visualizer -->
+            <section class="reactor-container">
+                <canvas id="reactor-canvas" width="460" height="460"></canvas>
+                <div class="reactor-label">ARC REACTOR ONLINE</div>
+                <canvas id="spectrum-canvas" width="460" height="70"></canvas>
+            </section>
+
+            <!-- Chat -->
+            <aside class="log-panel">
+                <div class="panel-header">
+                    <span>TRANSMISSION LOG</span>
+                    <span id="connection-dot" class="dot"></span>
+                </div>
+                <div id="chat-content" class="chat-content">
+                    <div class="bubble system">› Establishing connection...</div>
+                </div>
+                <div class="input-area">
+                    <input type="text" id="command-input" placeholder='Type a command, or just speak...'>
+                    <button id="send-btn" class="btn-primary">SEND</button>
+                </div>
+            </aside>
+        </main>
+
+        <footer>
+            <div class="footer-item">CORE TEMP: <span id="temp">32.0°C</span></div>
+            <div class="footer-item">MODE: <strong>CONTINUOUS</strong></div>
+            <div class="footer-item">UPTIME: <span id="uptime">00:00</span></div>
+            <button id="shutdown-btn" class="btn-danger" title="Apaga el sistema">SHUTDOWN</button>
+        </footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
