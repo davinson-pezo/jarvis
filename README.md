@@ -1,91 +1,97 @@
 # Jarvis
 
-Asistente de voz bilingüe (español/inglés) para macOS, al estilo del Jarvis de Tony Stark. Escucha por el micrófono, responde con la voz `say` del sistema y usa **Google Gemini** como cerebro. Detecta automáticamente el idioma en el que le hablas y contesta en el mismo — incluso si mezclas ambos en la misma sesión.
+Bilingual (Spanish / English) voice assistant for macOS, inspired by Tony Stark's Jarvis. Listens through the microphone, replies using the system's `say` voice, and uses **Google Gemini** as its brain. Automatically detects the language you speak in and answers in the same one — even if you switch mid-session.
 
-Incluye dos interfaces:
+It ships with two interfaces:
 
-- **Jarvis.app** — HUD de escritorio en CustomTkinter.
-- **Jarvis Web.app** — servidor Flask + Socket.IO que abre un HUD en el navegador.
+- **Jarvis.app** — desktop HUD built with CustomTkinter.
+- **Jarvis Web.app** — Flask + Socket.IO server that opens a HUD in your browser.
 
-Ambas comparten el mismo núcleo (`jarvis_core.py`).
+Both share the same core (`jarvis_core.py`).
 
 ---
 
-## Requisitos
+## Requirements
 
-- macOS (usa `say` para TTS y `open` para el navegador).
-- Python 3.11+ (probado con 3.14).
-- [Homebrew](https://brew.sh) para instalar `python-tk`.
-- Un micrófono.
-- Una API key de Gemini — es **gratuita** en [Google AI Studio](https://aistudio.google.com/apikey).
+- macOS (uses `say` for TTS and `open` for the browser).
+- Python 3.11+ (tested on 3.14).
+- [Homebrew](https://brew.sh) to install `python-tk`.
+- A microphone.
+- A Gemini API key — **free** at [Google AI Studio](https://aistudio.google.com/apikey).
 
-## Instalación rápida
+## Quick install
 
 ```bash
-git clone <este-repo> jarvis_project
-cd jarvis_project
+git clone https://github.com/davinson-pezo/jarvis.git
+cd jarvis
 cp .env.example .env
-# edita .env y pega tu GEMINI_API_KEY
+# edit .env and paste your GEMINI_API_KEY
 ./setup.command
 ```
 
-`setup.command` crea el venv, instala dependencias y compila las dos `.app` en `dist/`. Puedes copiarlas a `/Applications` y usarlas con doble clic.
+`setup.command` creates the venv, installs dependencies, and builds both `.app` bundles in `dist/`. You can copy them to `/Applications` and launch them with a double click.
 
-## Instalación manual (modo desarrollo)
+## Manual install (dev mode)
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # y rellena tu API key
+cp .env.example .env        # and fill in your API key
 ```
 
-Arrancar en modo dev:
+Run in dev mode:
 
 ```bash
 python jarvis_app.py        # desktop
-python jarvis_web.py        # web (abre http://localhost:5005)
+python jarvis_web.py        # web (opens http://localhost:5005)
 ```
 
-## Variables de entorno
+## Environment variables
 
-Todas opcionales salvo `GEMINI_API_KEY`. Ver `.env.example` para la lista completa:
+All optional except `GEMINI_API_KEY`. See `.env.example` for the full list:
 
-- `GEMINI_API_KEY` — **obligatoria**, tu API key de Gemini.
-- `FLASK_SECRET_KEY` — clave de sesión del servidor web.
-- `JARVIS_VOICE_ES` / `JARVIS_VOICE_EN` — voces de `say` por idioma (por defecto `Jorge` / `Daniel`). Lista con `say -v '?'`.
-- `JARVIS_MODEL` — modelo de Gemini (por defecto `gemini-2.5-flash`).
-- `JARVIS_NO_BROWSER=1` — no abrir el navegador automáticamente en la web app.
+- `GEMINI_API_KEY` — **required**, your Gemini API key.
+- `FLASK_SECRET_KEY` — session signing key for the web server.
+- `JARVIS_VOICE_ES` / `JARVIS_VOICE_EN` — macOS `say` voices per language (defaults: `Jorge` / `Daniel`). List available voices with `say -v '?'`.
+- `JARVIS_MODEL` — Gemini model (default: `gemini-2.5-flash`).
+- `JARVIS_NO_BROWSER=1` — skip the automatic browser open for the web app.
 
-## Uso
+## Usage
 
-Di **"Jarvis"** para despertarlo; te escuchará durante unos segundos y luego pensará y responderá. Puedes seguir hablando sin repetir la wake-word mientras la conversación esté activa.
+Say **"Jarvis"** to wake him up; he will listen for a few seconds, think, and reply. You can keep talking without repeating the wake word while the conversation is active.
 
-Atajos por texto (solo web): hay un input en el HUD lateral para escribirle en lugar de hablarle. Útil cuando estás en una llamada.
+Text shortcut (web only): there is an input box in the side HUD to type to him instead of talking. Useful when you're on a call.
 
-Apagado: botón de shutdown en el HUD, o cerrar la app por Activity Monitor.
+Shutdown: shutdown button in the HUD, or quit from Activity Monitor.
 
-## Arquitectura
+## Architecture
 
 ```
-jarvis_core.py   —  Cerebro: Gemini, voz, reconocimiento, idioma, wake-word, historial.
-jarvis_app.py    —  UI de escritorio (CustomTkinter).
-jarvis_web.py    —  Servidor Flask + Socket.IO (HUD en navegador).
-templates/       —  HTML del HUD web.
-static/          —  CSS/JS del HUD web.
-build_*.sh       —  Scripts PyInstaller para empaquetar .app.
+jarvis_core.py   —  Brain: Gemini, voice, speech recognition, language, wake word, history.
+jarvis_app.py    —  Desktop UI (CustomTkinter).
+jarvis_web.py    —  Flask + Socket.IO server (browser HUD).
+templates/       —  Web HUD HTML.
+static/          —  Web HUD CSS / JS.
+build_*.sh       —  PyInstaller scripts for packaging .app bundles.
 ```
 
-El core expone callbacks (`on_status`, `on_speak`) que tanto la UI de escritorio como el bridge web consumen — añadir una nueva interfaz es solo cablearse a esos callbacks.
+The core exposes callbacks (`on_status`, `on_speak`) that both the desktop UI and the web bridge consume — adding a new interface is just wiring into those callbacks.
 
-## Detección de idioma
+## Language detection
 
-Jarvis envía el audio a Google ASR en paralelo como `es-ES` y `en-US`, y puntúa ambas transcripciones con un sistema de marcadores de idioma (artículos, conjugaciones, signos ¿¡, tildes, etc.). Cuando ambas versiones son internamente coherentes, aplica un pequeño sesgo hacia inglés — empíricamente el ASR español tiende a alucinar frases plausibles en español a partir de audio inglés, y este sesgo corrige ese artefacto.
+Jarvis sends audio to Google ASR in parallel as both `es-ES` and `en-US`, and scores each transcript with a language-marker system (articles, conjugations, ¿¡ punctuation, accents, etc.). When both transcripts are internally coherent, it applies a small bias toward English — empirically the Spanish ASR tends to hallucinate plausible Spanish sentences from English audio, and this bias corrects that artifact.
 
-## Licencia
+## ☕ Support the Project
 
-MIT — ver [LICENSE](LICENSE).
+If this tool has been helpful and you'd like to support its development, feel free to buy me a coffee!
 
-## Créditos
+[![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate?business=davinson@gmail.com&no_recurring=0&item_name=Jarvis+Support&currency_code=EUR)
 
-Cerebro: [Google Gemini](https://ai.google.dev). Voz: `say` de macOS. ASR: Google Speech Recognition vía la librería [`SpeechRecognition`](https://github.com/Uberi/speech_recognition). UI: [CustomTkinter](https://customtkinter.tomschimansky.com) y [Flask-SocketIO](https://flask-socketio.readthedocs.io).
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Credits
+
+Brain: [Google Gemini](https://ai.google.dev). Voice: macOS `say`. ASR: Google Speech Recognition via the [`SpeechRecognition`](https://github.com/Uberi/speech_recognition) library. UI: [CustomTkinter](https://customtkinter.tomschimansky.com) and [Flask-SocketIO](https://flask-socketio.readthedocs.io).
