@@ -89,6 +89,35 @@ build_*.sh       —  PyInstaller scripts for packaging .app bundles.
 
 The core exposes callbacks (`on_status`, `on_speak`) that both the desktop UI and the web bridge consume — adding a new interface is just wiring into those callbacks.
 
+## 🔌 Extending Jarvis — OpenClaw integration (community direction)
+
+As it stands, Jarvis is a **voice layer** wrapping Gemini: great at conversation and reasoning, but it can't touch your machine. A natural next step is to bolt Jarvis onto a local agent with tool-use capabilities — [**OpenClaw**](https://openclaw.ai) is a strong candidate for macOS.
+
+The architecture would look like this:
+
+```
+🎙️  Mic  →  Jarvis (wake word, ASR, language)
+                     ↓
+                  OpenClaw (local agent on port 18789, Bearer auth)
+                     ↓  tool-use
+          ┌──────────┼──────────┬──────────┬──────────┐
+        Files     Apps       Mail      Calendar    Shell
+                     ↓
+🔊  say  ←  Jarvis (TTS in the detected language)
+```
+
+Concretely, on a Mac this would unlock things like:
+
+- 📁 *"Jarvis, create a folder on my Desktop called 'Taxes 2026' and move every PDF from Downloads into it."*
+- 🧭 *"Open Spotify, play some focus music, and dim the lights."* (via Shortcuts / AppleScript bridges)
+- 📬 *"Read me the latest unread email from María and draft a reply saying I'll call her tomorrow."*
+- 🗓️ *"What's on my calendar for Thursday? Add a 3 pm slot titled 'Dentist'."*
+- 🧰 Cross-app workflows that would otherwise require half a dozen clicks.
+
+**Why this isn't merged into `main`:** OpenClaw isn't universally installed, and forcing that dependency on everyone just to chat with Gemini would be overkill. The current repo keeps the Gemini-only path clean so anyone with a free API key can run it.
+
+**If you want to take this on:** the integration point is `JarvisCore.think()` in `jarvis_core.py`. Instead of (or in addition to) calling `self.client.models.generate_content(...)`, the method could POST to an OpenClaw gateway and pipe the response back through the existing `on_speak` / `on_status` callbacks. The bilingual scoring and voice routing keep working unchanged. PRs welcome — and if you build it, please keep the OpenClaw path opt-in (e.g. `JARVIS_BRAIN=openclaw` in `.env`) so Gemini-only users aren't affected.
+
 ## 🌐 Language detection
 
 Jarvis sends audio to Google ASR in parallel as both `es-ES` and `en-US`, and scores each transcript with a language-marker system (articles, conjugations, ¿¡ punctuation, accents, etc.). When both transcripts are internally coherent, it applies a small bias toward English — empirically the Spanish ASR tends to hallucinate plausible Spanish sentences from English audio, and this bias corrects that artifact.
