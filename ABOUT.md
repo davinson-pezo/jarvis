@@ -1,1 +1,0 @@
-J.A.R.V.I.S. v3 — An advanced AI voice assistant inspired by Iron Man's JARVIS. Multi-platform (desktop & web) with real-time voice recognition, Gemini integration, and interactive HUD. Features continuous listening, natural language processing in English & Spanish, and a beautiful cyberpunk-themed interface.

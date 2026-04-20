@@ -23,6 +23,20 @@ Ships as two macOS apps that share the same core:
 - 🎨 **HUD visuals** — animated arc reactor that changes color per state (idle / listening / thinking / speaking) and reacts to real mic audio levels.
 - 📦 **Double-click launch** — ships as two `.app` bundles; no terminal required after setup.
 
+## 📸 Screenshots
+
+**Desktop HUD** — CustomTkinter window with animated arc reactor, transmission log, and linear spectrum. Color palette shifts with state (idle / listening / thinking / speaking).
+
+| Listening | Speaking |
+|:---:|:---:|
+| ![Desktop HUD — Listening](assets/screenshots/desktop-listening.png) | ![Desktop HUD — Speaking](assets/screenshots/desktop-speaking.png) |
+
+**Web HUD** — the same experience in your browser, with a text input box and a `CORE TEMP / MODE / UPTIME` footer. Shutdown overlays the screen with *"Good bye, sir."* before terminating the server.
+
+| Speaking | Shutting down |
+|:---:|:---:|
+| ![Web HUD — Speaking](assets/screenshots/web-speaking.png) | ![Web HUD — Shutdown](assets/screenshots/web-shutdown.png) |
+
 ## 📋 Requirements
 
 - macOS (uses `say` for TTS and `open` to launch the browser).
