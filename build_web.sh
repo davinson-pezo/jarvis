@@ -4,7 +4,7 @@
 set -e
 
 echo "==> [Web] Compilando Jarvis Web.app..."
-pyinstaller \
+.venv/bin/pyinstaller \
   --noconfirm \
   --windowed \
   --name "Jarvis Web" \
@@ -12,10 +12,20 @@ pyinstaller \
   --add-data "jarvis_core.py:." \
   --add-data "templates:templates" \
   --add-data "static:static" \
+  --add-data ".env:." \
+  --collect-all kokoro \
+  --collect-all misaki \
+  --collect-all phonemizer \
+  --collect-all espeakng_loader \
+  --collect-all language_tags \
+  --collect-all spacy \
+  --collect-all en_core_web_sm \
   --hidden-import "engineio.async_drivers.threading" \
   --hidden-import "google.genai" \
   --hidden-import "pydantic" \
   --hidden-import "charset_normalizer" \
+  --hidden-import "torch" \
+  --hidden-import "numpy" \
   jarvis_web.py
 
 echo "==> [Web] Permiso de micrófono en Info.plist..."

@@ -92,6 +92,7 @@ class ReactorCanvas(tk.Canvas):
             highlightthickness=0,
             bd=0,
         )
+        self.configure(bg=BG) # Asegurar fondo en CustomTkinter
         self._state = "idle"
         self._audio_level = 0.0
         self._smoothed_level = 0.0
@@ -377,13 +378,9 @@ class JarvisApp(ctk.CTk):
         )
         self.close_btn.pack(side="right")
 
-        # --- Núcleo ------------------------------------------------------
-        api_key = os.getenv("GEMINI_API_KEY")
-        self.core = JarvisCore(
-            api_key=api_key,
-            on_status=self._on_status,
-            on_speak=self._on_speak,
-        )
+        # --- Núcleo (Carga en diferido) -----------------------------------
+        self.core = None
+        self._core_ready = False
 
         # Nivel de audio: el callback puede llegar desde otro hilo, así que
         # no tocamos widgets directamente — solo una variable atómica.
@@ -394,15 +391,29 @@ class JarvisApp(ctk.CTk):
 
         self.protocol("WM_DELETE_WINDOW", self.shutdown_jarvis)
 
-        # Arrancar Jarvis en background
-        self._voice_thread = threading.Thread(target=self._run_core, daemon=True)
-        self._voice_thread.start()
+        # Arrancar inicialización del núcleo en background
+        threading.Thread(target=self._init_core_async, daemon=True).start()
 
-    # ------------------------------------------------------------------
-    # Bucle del núcleo en background
-    # ------------------------------------------------------------------
+    def _init_core_async(self):
+        """Carga los modelos pesados sin bloquear la ventana."""
+        try:
+            api_key = os.getenv("GEMINI_API_KEY")
+            core = JarvisCore(
+                api_key=api_key,
+                on_status=self._on_status,
+                on_speak=self._on_speak,
+            )
+            self.core = core
+            self._core_ready = True
+            
+            # Una vez cargado, lanzamos el bucle de voz
+            self._voice_thread = threading.Thread(target=self._run_core, daemon=True)
+            self._voice_thread.start()
+        except Exception as e:
+            self.after(0, self._on_status, "ERROR", f"Load failed: {str(e)}")
 
     def _run_core(self):
+        if not self.core: return
         self.core.run_voice_loop(
             level_callback=self._set_level,
             greeting="Good evening, sir. Systems are online.",
@@ -455,19 +466,23 @@ class JarvisApp(ctk.CTk):
 
     def shutdown_jarvis(self) -> None:
         """Despedida con animación de fade y cierre limpio."""
+        if not self.core:
+            self._hard_close()
+            return
+
         self.close_btn.configure(state="disabled", text="SHUTTING DOWN...")
         self.status_label.configure(text="SHUTTING DOWN", text_color=RED)
         self.reactor.set_state("offline")
         self._append_log("Good bye, sir.")
-        # Cortamos el bucle y el `say` que pudiera estar sonando para que el
-        # adiós pueda empezar de inmediato (antes se quedaba detrás).
-        self.core.shutdown()
+        # Cortamos el habla que pudiera estar sonando para que el
+        # adiós pueda empezar de inmediato.
         self.core.interrupt_speech()
 
         # Despedida bloqueante en un hilo para que la UI se vea apagarse.
         def _farewell():
             self.core.speak("Good bye, sir.", lang="en")
-            # Espera a que termine el último `say` y luego destruye todo.
+            # Ahora sí, paramos los bucles de fondo y cerramos.
+            self.core.shutdown()
             self.after(0, self._hard_close)
 
         threading.Thread(target=_farewell, daemon=True).start()

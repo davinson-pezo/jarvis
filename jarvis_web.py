@@ -114,7 +114,7 @@ class WebBridge:
         # on_status puede ser invocado desde dentro del __init__ de JarvisCore
         # (antes de que self.core esté asignado), así que nos protegemos.
         core = getattr(self, "core", None)
-        voice = core.voice_for(self.last_lang) if core else "Daniel"
+        voice = core.voice_for(self.last_lang) if core else "bm_fable"
         socketio.emit(
             "status_update",
             {
@@ -162,17 +162,18 @@ class WebBridge:
     def shutdown(self) -> None:
         """Despedida + cierre del proceso entero."""
         self.running = False
-        # Señalamos al bucle de voz que pare y cortamos cualquier habla
-        # que esté en curso (antes el 'Good bye' se ponía en cola detrás
-        # de la respuesta que Jarvis estaba soltando).
-        self.core.stop_event.set()
+        # Cortamos cualquier habla que esté en curso para dar paso a la despedida.
         self.core.interrupt_speech()
+        
         socketio.emit("shutdown_ack", {"message": "Good bye, sir."})
-        # Pequeña pausa para que el cliente pinte el estado de apagado antes
-        # de que la UI se muera.
+        # Pequeña pausa para que el cliente pinte el estado de apagado.
         time.sleep(0.3)
+        
+        # Hablamos la despedida (es bloqueante, así que esperará a terminar).
         self.core.speak("Good bye, sir.", lang="en")
-        # Le damos un pequeño respiro al `say` y cerramos a martillazos.
+        
+        # Ahora sí, marcamos el stop para los bucles de fondo y cerramos.
+        self.core.stop_event.set()
         threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM)).start()
 
 

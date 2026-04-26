@@ -5,8 +5,8 @@ Núcleo compartido entre la app de escritorio (Tkinter) y el servidor web (Flask
 
 Responsabilidades:
 - Cliente Gemini con salida JSON nativa (sin frágiles strip de backticks).
-- Detección de idioma y selección de voz de macOS (Daniel para inglés, Jorge
-  para español de España).
+- Selección de voz con Kokoro TTS (bm_fable para inglés, em_alex
+  para español).
 - Transcripción con fallback ES -> EN cuando el reconocimiento no entiende.
 - Historial de conversación corto (memoria de sesión).
 - Detección de wake-word ("jarvis" / "hey jarvis" / "hola jarvis").
@@ -28,24 +28,24 @@ from typing import Callable, Deque, Optional, Tuple
 import speech_recognition as sr
 from google import genai
 from google.genai import types
-
+import sounddevice as sd
+from kokoro import KPipeline
+import numpy as np
 
 # ---------------------------------------------------------------------------
 # Configuración de voces y wake-word
 # ---------------------------------------------------------------------------
 
-# Voces de macOS por preferencia: la primera que esté instalada gana.
-# Daniel (en_GB) es el clásico británico que suena muy "Jarvis".
-# Para castellano peninsular, Jorge es la contraparte más cercana (masculino
-# España). Si no está, caemos a Diego/Juan (masculinos de otras regiones)
-# antes de ir a voces femeninas.
+# Voces preferidas usando Kokoro TTS
+# en: bm_fable (masculina británica) o af_heart (femenina americana, calidad A)
+# es: em_alex (masculino) o ef_dora (femenina)
 VOICE_PREFERENCES = {
-    "en": ["Daniel", "Oliver", "Alex", "Arthur", "Fred"],
-    "es": ["Jorge", "Diego", "Juan", "Paulina", "Monica", "Marisol"],
+    "en": "bm_fable",
+    "es": "em_alex",
 }
 
-# Fallback final si NADA del macOS está disponible (no rompemos, solo avisamos).
-FALLBACK_VOICE = "Alex"
+# Fallback final si falla el idioma
+FALLBACK_VOICE = "bm_fable"
 
 # Palabras que aceptamos como "wake-word". Incluye variaciones comunes que
 # Google Speech suele confundir (jarvi, yarvis, harvey, jarbis...).
@@ -158,25 +158,27 @@ class JarvisCore:
         # para ignorar audio mientras Jarvis tiene la palabra.
         self._speaking_event = threading.Event()
 
-        # Detectamos qué voces de macOS hay realmente instaladas para no
-        # acabar usando la voz por defecto del sistema (que suele ser Siri
-        # femenina si la voz pedida no existe).
-        self._installed_voices = _discover_installed_voices()
-        self._voice_by_lang = {}
-        for lang, candidates in VOICE_PREFERENCES.items():
-            # Permitimos sobrescribir cualquier idioma con JARVIS_VOICE_ES /
-            # JARVIS_VOICE_EN en el .env. Útil para usar voces Siri que tienen
-            # nombres raros con espacios y paréntesis.
-            override = os.getenv(f"JARVIS_VOICE_{lang.upper()}")
-            if override:
-                self._voice_by_lang[lang] = override.strip()
-            else:
-                self._voice_by_lang[lang] = self._pick_voice(candidates)
+        # Configuración para usar Kokoro en MPS (Apple Silicon) de forma forzada si falla algo
+        os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+
+        self._voice_by_lang = {
+            "en": os.getenv("JARVIS_VOICE_EN", VOICE_PREFERENCES["en"]),
+            "es": os.getenv("JARVIS_VOICE_ES", VOICE_PREFERENCES["es"]),
+        }
+        
+        # Diccionario para instanciar las pipelines de Kokoro 
+        # (ej: 'a' para af_heart, 'b' para bm_fable, 'e' para em_alex/ef_dora)
+        self.k_pipelines = {}
+        
+        # Pre-cargamos los motores para evitar delay en la primera respuesta.
+        print("==> [Core] Cargando motores de voz Kokoro (en/es)...")
+        self._get_pipeline_for_voice(self._voice_by_lang["en"])
+        self._get_pipeline_for_voice(self._voice_by_lang["es"])
+        
         # IMPORTANTE: NO llamamos a on_status aquí. La UI todavía está
         # construyéndose (ej. WebBridge aún no ha asignado self.core) y
         # cualquier callback que toque atributos de la UI explotaría.
-        # El aviso se emite al iniciar run_voice_loop().
-        self._pending_voice_warning = self._compute_voice_warning()
+        self._pending_voice_warning = None
 
     # ------------------------------------------------------------------
     # Estado
@@ -195,88 +197,65 @@ class JarvisCore:
             self._history.clear()
 
     # ------------------------------------------------------------------
-    # Voz de salida (TTS con `say` de macOS)
+    # Voz de salida (TTS con Kokoro)
     # ------------------------------------------------------------------
 
     def voice_for(self, lang: str) -> str:
         code = (lang or "en").lower()[:2]
         return self._voice_by_lang.get(code) or FALLBACK_VOICE
 
-    def _pick_voice(self, candidates: list) -> str:
-        """Escoge la primera voz de `candidates` que esté instalada."""
-        for v in candidates:
-            if v.lower() in self._installed_voices:
-                return v
-        # Si no hay ninguna, caemos al fallback (puede que tampoco esté,
-        # pero así `say` al menos usa algo coherente).
-        return FALLBACK_VOICE
-
-    def _compute_voice_warning(self) -> Optional[str]:
-        """Calcula (sin emitir) el aviso de voces que faltan."""
-        missing = []
-        for lang, pref in VOICE_PREFERENCES.items():
-            if pref[0].lower() not in self._installed_voices:
-                got = self._voice_by_lang[lang]
-                missing.append(f"{lang}: {pref[0]} no instalada, usando {got}")
-        if not missing:
-            return None
-        return (
-            " | ".join(missing)
-            + ". Descarga voces en Ajustes → Accesibilidad → Contenido hablado."
-        )
+    def _get_pipeline_for_voice(self, voice_id: str) -> KPipeline:
+        """Inicializa o recupera la pipeline de Kokoro basada en la inicial de la voz."""
+        lang_code = voice_id[0]  # 'a' (american), 'b' (british), 'e' (es)
+        if lang_code not in self.k_pipelines:
+            # Especificamos repo_id para evitar el aviso de 'Defaulting...'
+            self.k_pipelines[lang_code] = KPipeline(
+                lang_code=lang_code, 
+                model=True, 
+                repo_id='hexgrad/Kokoro-82M'
+            )
+        return self.k_pipelines[lang_code]
 
     def _flush_pending_warnings(self) -> None:
         """Emite los avisos acumulados durante __init__ (cuando la UI ya existe)."""
-        if self._pending_voice_warning:
-            self.on_status("Warning", self._pending_voice_warning)
-            self._pending_voice_warning = None
+        pass
 
     def speak(self, text: str, lang: str = "en") -> None:
         """
-        Habla con la voz correcta según el idioma. Bloqueante.
-        Usa un lock para serializar: si llega otro speak mientras uno está
-        en curso (típico con comandos de texto + voz), el segundo espera.
+        Habla con la voz correcta según el idioma, utilizando Kokoro TTS local.
+        Bloqueante. Usa un lock para serializar la voz.
         """
         if not text:
             return
         voice = self.voice_for(lang)
+        pipeline = self._get_pipeline_for_voice(voice)
+        
         self.on_speak(text, lang)
         with self._speech_lock:
             self._speaking_event.set()
             try:
-                self._current_speech = subprocess.Popen(
-                    ["say", "-v", voice, text]
-                )
-                self._current_speech.wait()
-            except FileNotFoundError:
-                # `say` solo existe en macOS; si alguien lo ejecuta en otro SO
-                # al menos no reventamos.
-                pass
+                # Reproducimos cada fragmento generado por Kokoro en tiempo real para minimizar latencia
+                for _, _, audio in pipeline(text, voice=voice, speed=1.0):
+                    if self.stop_event.is_set():
+                        break
+                    if len(audio) > 0:
+                        # sounddevice reproduce los arrays numpy. Kokoro genera en 24000 Hz.
+                        sd.play(audio, samplerate=24000, blocking=True)
+            except Exception as e:
+                self.on_status("Error", f"TTS Error: {e}")
             finally:
-                self._current_speech = None
+                sd.stop()
                 self._speaking_event.clear()
 
     def interrupt_speech(self) -> None:
         """
-        Mata el `say` que esté sonando ahora mismo. Útil en shutdown o si se
-        quiere implementar un "cállate" por voz / tecla. No bloquea.
+        Mata la reproducción de voz actual en sounddevice. Útil en shutdown.
+        No bloquea.
         """
-        proc = self._current_speech
-        if proc is None:
-            return
-        if proc.poll() is not None:
-            return
         try:
-            proc.terminate()
+            sd.stop()
         except Exception:
-            return
-        try:
-            proc.wait(timeout=1)
-        except Exception:
-            try:
-                proc.kill()
-            except Exception:
-                pass
+            pass
 
     @property
     def is_speaking(self) -> bool:
@@ -814,35 +793,3 @@ class _LevelSniffingStream:
         return getattr(self._inner, attr)
 
 
-# ---------------------------------------------------------------------------
-# Detección de voces instaladas en macOS
-# ---------------------------------------------------------------------------
-
-def _discover_installed_voices() -> set:
-    """
-    Llama a `say -v '?'` y devuelve el conjunto de nombres de voz instalados
-    en minúsculas. Si no estamos en macOS, devuelve un set vacío.
-    """
-    try:
-        result = subprocess.run(
-            ["say", "-v", "?"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=3,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return set()
-
-    voices = set()
-    # Cada línea es: "Nombre         locale   # muestra de texto"
-    for line in result.stdout.splitlines():
-        parts = line.split()
-        if not parts:
-            continue
-        name = parts[0]
-        # Las voces con espacios en el nombre (p.ej. "Good News") aparecen
-        # con locale en la segunda columna de caracteres; `split()` ya nos
-        # da el primer token, que es suficiente para nuestro map.
-        voices.add(name.lower())
-    return voices
