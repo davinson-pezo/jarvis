@@ -40,7 +40,7 @@ def _load_env() -> None:
     candidates = [
         os.path.join(os.getcwd(), ".env"),
         os.path.expanduser("~/.jarvis/.env"),
-        os.path.expanduser("~/Documents/jarvis_project/.env"),
+        os.path.expanduser("~/jarvis_project/.env"),
     ]
     # Si estamos en el mismo directorio del script (modo dev), también.
     here = os.path.abspath(os.path.dirname(__file__))

@@ -7,6 +7,16 @@ google-genai>=0.3.0
 # Voz y audio
 SpeechRecognition>=3.10.0
 PyAudio>=0.2.13
+sounddevice>=0.4.6
+numpy>=1.26.0
+torch>=2.2.0
+kokoro>=0.1.0
+phonemizer-fork>=3.3.2
+espeakng-loader>=0.2.0
+
+# NLP (utilizado por el reconocimiento y TTS)
+spacy>=3.7.0
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 
 # UI de escritorio
 customtkinter>=5.2.0

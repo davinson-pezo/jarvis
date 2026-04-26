@@ -17,7 +17,7 @@ if ! command -v brew >/dev/null 2>&1; then
   exit 1
 fi
 
-PY=$(command -v python3.14 || command -v python3)
+PY=$(command -v python3.11 || command -v python3.12 || command -v python3.13 || command -v python3)
 echo "[1/5] Usando Python: $PY ($($PY --version))"
 
 echo

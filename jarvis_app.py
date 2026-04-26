@@ -33,7 +33,7 @@ def _load_env() -> None:
         os.path.join(here, ".env"),
         os.path.join(os.getcwd(), ".env"),
         os.path.expanduser("~/.jarvis/.env"),
-        os.path.expanduser("~/Documents/jarvis_project/.env"),
+        os.path.expanduser("~/jarvis_project/.env"),
     ]
     for path in candidates:
         if os.path.exists(path):
