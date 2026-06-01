@@ -184,7 +184,7 @@ For typed input in the web HUD, the same scoring is used to pick the reply langu
 
 If this tool has been helpful and you'd like to support its development, feel free to buy me a coffee!
 
-[![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate?business=davinson@gmail.com&no_recurring=0&item_name=Jarvis+Support&currency_code=EUR)
+[![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/dpezo)
 
 ## 📄 License
 
